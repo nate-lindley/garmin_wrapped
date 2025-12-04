@@ -1,4 +1,6 @@
 *.csv
-/data/*
+data/*
 .DS_Store*
 __pycache__
+.env
+.venv

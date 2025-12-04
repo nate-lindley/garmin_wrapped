@@ -46,6 +46,36 @@ def filter_year(df: pd.DataFrame, year: int) -> pd.DataFrame:
         return df
     return df[df["start_time_local"].dt.year == year].copy()
 
+
+def run_analysis(clean_path: Path, year: int | None = 2025) -> None:
+    """
+    End-to-end analysis pipeline:
+    - load cleaned CSV
+    - optional year filter
+    - drop containers and apply sport grouping
+    - generate stats and charts
+    """
+    df = load_cleaned_data(clean_path)
+    if year is not None:
+        df = filter_year(df, year)
+    df = drop_container_activities(df)
+    df = apply_sport_groups(df)
+    stats = compute_stats(df)
+
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
+    plot_activity_counts(df)
+    plot_distance_over_time(df)
+    plot_heart_rate_hist(df)
+    plot_duration_by_sport(df)
+    plot_hr_zone_distribution(df)
+    plot_weekly_totals(df)
+
+    print("Key stats:")
+    for key, value in stats.items():
+        print(f"- {key}: {value}")
+
+    print(f"\nCharts saved to {FIG_DIR}")
+
 def compute_stats(df: pd.DataFrame) -> dict[str, Any]:
     stats: dict[str, Any] = {}
 
@@ -212,25 +242,7 @@ def plot_weekly_totals(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    df = load_cleaned_data()
-    df = filter_year(df, 2025)
-    df = drop_container_activities(df)
-    df = apply_sport_groups(df)
-    stats = compute_stats(df)
-
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    plot_activity_counts(df)
-    plot_distance_over_time(df)
-    plot_heart_rate_hist(df)
-    plot_duration_by_sport(df)
-    plot_hr_zone_distribution(df)
-    plot_weekly_totals(df)
-
-    print("Key stats:")
-    for key, value in stats.items():
-        print(f"- {key}: {value}")
-
-    print(f"\nCharts saved to {FIG_DIR}")
+    run_analysis(clean_path=CLEAN_PATH, year=2025)
 
 
 if __name__ == "__main__":

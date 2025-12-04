@@ -1,10 +1,10 @@
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 
-SOURCE = Path("data/summarized_activities.json")
-OUTPUT = Path("data/summarized_activities_clean.csv")
+ENV_SOURCE_KEY = "GARMIN_SOURCE_PATH"
 
 
 def read_activity_records(path: Path) -> list[dict]:
@@ -138,13 +138,22 @@ def tidy_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
-    clean_df = clean_summarized_activities()
-    print(clean_df.head())
+    source_path = resolve_source_path()
+    output_path = Path("data/clean") / f"{source_path.stem}_clean.csv"
+
+    clean_df = clean_summarized_activities(source=source_path, output=output_path)
+
+    # Run exploratory analysis/visualization on the cleaned data.
+    from exploration import run_analysis
+
+    run_analysis(clean_path=output_path, year=2025)
+
+    print("\nCleaning + analysis complete. Clean CSV:", output_path)
 
 
 def clean_summarized_activities(
-    source: Path | str = SOURCE,
-    output: Path | str | None = OUTPUT,
+    source: Path | str,
+    output: Path | str | None = None,
 ) -> pd.DataFrame:
     """
     End-to-end cleaning utility: load raw Garmin export JSON, normalize fields,
@@ -162,6 +171,43 @@ def clean_summarized_activities(
         clean_df.to_csv(output_path, index=False)
 
     return clean_df
+
+
+def resolve_source_path() -> Path:
+    """
+    Resolve the input JSON path from environment or .env.
+    Priority:
+    1) GARMIN_SOURCE_PATH env var
+    2) GARMIN_SOURCE_PATH entry in .env
+    3) default data/summarized_activities.json
+    """
+    # 1) environment variable
+    env_path = os.getenv(ENV_SOURCE_KEY)
+
+    # 2) .env file fallback
+    if not env_path:
+        env_file = Path(".env")
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    if key.strip() == ENV_SOURCE_KEY:
+                        env_path = value.strip().strip('"').strip("'")
+                        break
+
+    # 3) default path
+    if not env_path:
+        env_path = "data/summarized_activities.json"
+
+    source_path = Path(env_path).expanduser()
+    if not source_path.exists():
+        raise FileNotFoundError(
+            f"Source JSON not found at {source_path}. Set {ENV_SOURCE_KEY} in .env or env."
+        )
+    return source_path
 
 
 if __name__ == "__main__":
